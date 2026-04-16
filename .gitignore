@@ -1,0 +1,20 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+
+# Generated PDFs
+**/*.pdf
+
+# Company CVs (personal, generated locally)
+companies/
+
+# Local config (contains personal paths)
+config.yml
+
+# macOS
+.DS_Store

@@ -1,0 +1,13 @@
+# -----------------------------------------------
+# resume-forge configuration
+# Fill this in once after cloning, then run:
+#   ./setup.sh
+# -----------------------------------------------
+
+# Your name — used for the output PDF/tex filename
+# Example: jake_gutierrez → companies/Spotify/jake_gutierrez_cv.pdf
+user_name: your_name
+
+# Shell config file to add the forge alias to
+# Common values: ~/.zshrc  ~/.bashrc  ~/.bash_profile
+shell_config: ~/.zshrc
