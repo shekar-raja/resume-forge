@@ -7,7 +7,7 @@
 
 Built for developers and job seekers who want full control over their CV without a subscription. One command creates a company-specific CV from your master template. Save, preview, submit.
 
-![Preview](docs/preview.png)
+<img src="docs/preview.png" alt="resume-forge terminal preview" width="800"/>
 
 ---
 

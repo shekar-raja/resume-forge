@@ -119,7 +119,7 @@ hrule_2col() {
   printf "${YELLOW}${lc}"; printf '─%.0s' $(seq 1 $L); printf "${mc}"; printf '─%.0s' $(seq 1 $R); printf "${rc}${RESET}\n"
 }
 
-TITLE_VIS=16
+TITLE_VIS=18            # visual length of "resume-forge v1.0.0"
 DASHES=$(( TW - TITLE_VIS - 8 ))
 
 echo ""
@@ -165,6 +165,9 @@ row "" ""
 # Bottom border
 echo -e "${YELLOW}╰$(printf '─%.0s' $(seq 1 $((TW-2))))╯${RESET}"
 echo ""
+
+# Preview-only mode: print banner and exit (used for screenshot generation)
+[ "$1" = "--preview" ] && exit 0
 
 while true; do
   echo -e "${BLUE}Company name:${RESET} \c"
