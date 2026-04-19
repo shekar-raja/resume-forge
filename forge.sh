@@ -55,11 +55,15 @@ fi
 # -----------------------------------------------
 
 MASTERS_DIR="$SCRIPT_DIR/masters"
-MASTERS=("$MASTERS_DIR"/*.tex)
+RESUME_MASTERS_DIR="$MASTERS_DIR/resume"
+COVER_LETTER_MASTERS_DIR="$MASTERS_DIR/cover_letter"
 
-if [ ! -e "${MASTERS[0]}" ]; then
-  error "No master CVs found in masters/"
-  echo "      Add a .tex file to the masters/ folder to get started"
+RESUME_MASTERS=("$RESUME_MASTERS_DIR"/*.tex)
+COVER_LETTER_MASTERS=("$COVER_LETTER_MASTERS_DIR"/*.tex)
+
+if [ ! -e "${RESUME_MASTERS[0]}" ] && [ ! -e "${COVER_LETTER_MASTERS[0]}" ]; then
+  error "No master templates found in masters/resume/ or masters/cover_letter/"
+  echo "      Add .tex files to the masters/resume/ and/or masters/cover_letter/ folders"
   exit 1
 fi
 
@@ -72,16 +76,25 @@ TW=$(tput cols 2>/dev/null || echo 80)
 [ "$TW" -lt 60 ] && TW=60
 [ "$TW" -gt 100 ] && TW=100
 
-# Left panel = 38% of width, right panel fills the rest (for bottom section)
-L=$(( TW * 38 / 100 ))
+# Left panel = 28% of width, right panel fills the rest (for bottom section)
+L=$(( TW * 28 / 100 ))
 R=$(( TW - L - 3 ))   # 3 = left border + separator + right border
 IW=$(( TW - 2 ))      # inner width (full-width rows)
 
-# Collect master names
-MASTER_NAMES=()
-for f in "${MASTERS[@]}"; do
-  MASTER_NAMES+=("$(basename "$f" .tex)")
-done
+# Collect master names for both categories
+RESUME_MASTER_NAMES=()
+if [ -e "${RESUME_MASTERS[0]}" ]; then
+  for f in "${RESUME_MASTERS[@]}"; do
+    RESUME_MASTER_NAMES+=("$(basename "$f" .tex)")
+  done
+fi
+
+COVER_LETTER_MASTER_NAMES=()
+if [ -e "${COVER_LETTER_MASTERS[0]}" ]; then
+  for f in "${COVER_LETTER_MASTERS[@]}"; do
+    COVER_LETTER_MASTER_NAMES+=("$(basename "$f" .tex)")
+  done
+fi
 
 padl() { printf "%-${L}s" "$1"; }
 
@@ -92,13 +105,19 @@ rowfw() {
 
 # Two-column row with right border — right content must be plain ASCII
 row() {
-  printf "${YELLOW}│${RESET}$(padl "$1")${YELLOW}│${RESET} %-$((R-1))s${YELLOW}│${RESET}\n" "$2"
+  local content="$2"
+  local maxlen=$((R-1))
+  [ ${#content} -gt $maxlen ] && content="${content:0:$((maxlen-3))}..."
+  printf "${YELLOW}│${RESET}$(padl "$1")${YELLOW}│${RESET} %-$((R-1))s${YELLOW}│${RESET}\n" "$content"
 }
 
 # Two-column row with green right header and right border — right content plain ASCII
 rowh() {
+  local content="$2"
+  local maxlen=$((R-1))
+  [ ${#content} -gt $maxlen ] && content="${content:0:$((maxlen-3))}..."
   local rpad
-  rpad=$(printf "%-$((R-1))s" "$2")
+  rpad=$(printf "%-$((R-1))s" "$content")
   printf "${YELLOW}│${RESET}$(padl "$1")${YELLOW}│${RESET} ${GREEN}${rpad}${RESET}${YELLOW}│${RESET}\n"
 }
 
@@ -141,26 +160,47 @@ hrule_2col "├" "┬" "┤"
 # Bottom section — two-column with right border
 rowh "  user: ${USER_NAME}"   "Quick start"
 rowsep ""
-row  ""  "  1. forge  - create a new company CV"
+row  ""  "  1. forge  - create CV, cover letter, or both"
 row  ""  "  2. Edit the .tex file in VS Code"
 row  ""  "  3. Save   - PDF compiles automatically"
 row  ""  "  4. Submit the PDF to your application"
 row  ""  ""
-rowh ""  "Available masters"
-rowsep ""
 
-MAX=5
-COUNT=0
-for name in "${MASTER_NAMES[@]}"; do
-  if [ $COUNT -lt $MAX ]; then
-    DISPLAY="  ${name}"
-    [ ${#DISPLAY} -gt $((R-2)) ] && DISPLAY="${DISPLAY:0:$((R-5))}..."
-    row "" "$DISPLAY"
-    COUNT=$((COUNT + 1))
-  fi
-done
-[ ${#MASTER_NAMES[@]} -gt $MAX ] && row "" "  ... and $((${#MASTER_NAMES[@]} - MAX)) more"
-row "" ""
+# Show resume masters
+if [ ${#RESUME_MASTER_NAMES[@]} -gt 0 ]; then
+  rowh ""  "Resume masters"
+  rowsep ""
+  MAX=3
+  COUNT=0
+  for name in "${RESUME_MASTER_NAMES[@]}"; do
+    if [ $COUNT -lt $MAX ]; then
+      DISPLAY="  ${name}"
+      [ ${#DISPLAY} -gt $((R-2)) ] && DISPLAY="${DISPLAY:0:$((R-5))}..."
+      row "" "$DISPLAY"
+      COUNT=$((COUNT + 1))
+    fi
+  done
+  [ ${#RESUME_MASTER_NAMES[@]} -gt $MAX ] && row "" "  ... and $((${#RESUME_MASTER_NAMES[@]} - MAX)) more"
+  row "" ""
+fi
+
+# Show cover letter masters
+if [ ${#COVER_LETTER_MASTER_NAMES[@]} -gt 0 ]; then
+  rowh ""  "Cover letter masters"
+  rowsep ""
+  MAX=3
+  COUNT=0
+  for name in "${COVER_LETTER_MASTER_NAMES[@]}"; do
+    if [ $COUNT -lt $MAX ]; then
+      DISPLAY="  ${name}"
+      [ ${#DISPLAY} -gt $((R-2)) ] && DISPLAY="${DISPLAY:0:$((R-5))}..."
+      row "" "$DISPLAY"
+      COUNT=$((COUNT + 1))
+    fi
+  done
+  [ ${#COVER_LETTER_MASTER_NAMES[@]} -gt $MAX ] && row "" "  ... and $((${#COVER_LETTER_MASTER_NAMES[@]} - MAX)) more"
+  row "" ""
+fi
 
 # Bottom border
 echo -e "${YELLOW}╰$(printf '─%.0s' $(seq 1 $((TW-2))))╯${RESET}"
@@ -181,52 +221,154 @@ while true; do
 done
 
 # -----------------------------------------------
-# Ask: Choose master CV
+# Ask: Role name (optional, for multiple roles at same company)
+# -----------------------------------------------
+
+# Helper: normalize role name to lowercase with underscores
+normalize_role() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | sed 's/[^a-z0-9_]//g'
+}
+
+echo -e "${BLUE}Role name (optional, press Enter to skip):${RESET} \c"
+read -r ROLE_INPUT
+
+ROLE=""
+if [ -n "$ROLE_INPUT" ]; then
+  ROLE=$(normalize_role "$ROLE_INPUT")
+  info "Role normalized to: $ROLE"
+fi
+
+# -----------------------------------------------
+# Ask: What to create (CV, Cover Letter, or Both)
 # -----------------------------------------------
 
 echo ""
-echo -e "${BLUE}Choose a master CV:${RESET}"
+echo -e "${BLUE}What would you like to create?${RESET}"
 echo ""
-
-INDEX=1
-for f in "${MASTERS[@]}"; do
-  echo "  [$INDEX] $(basename "$f" .tex)"
-  INDEX=$((INDEX + 1))
-done
-
+echo "  [1] Resume/CV"
+echo "  [2] Cover letter"
+echo "  [3] Both"
 echo ""
-
-MASTER_COUNT=${#MASTERS[@]}
 
 while true; do
-  echo -e "${BLUE}Enter number (1-${MASTER_COUNT}):${RESET} \c"
-  read -r CHOICE
+  echo -e "${BLUE}Enter choice (1-3):${RESET} \c"
+  read -r DOC_CHOICE
 
-  if [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le "$MASTER_COUNT" ]; then
-    MASTER="${MASTERS[$((CHOICE - 1))]}"
-    MASTER_NAME="$(basename "$MASTER" .tex)"
-    break
-  else
-    warning "Invalid choice. Please enter a number between 1 and ${MASTER_COUNT}."
-  fi
+  case "$DOC_CHOICE" in
+    1) DOC_TYPE="cv"; break ;;
+    2) DOC_TYPE="cover"; break ;;
+    3) DOC_TYPE="both"; break ;;
+    *) warning "Invalid choice. Please enter 1, 2, or 3." ;;
+  esac
 done
 
 # -----------------------------------------------
-# Create company folder and copy master
+# Helper function: Select a master template
+# -----------------------------------------------
+
+select_master() {
+  local masters_array=("$@")
+  local master_count=${#masters_array[@]}
+  local selected_master=""
+
+  echo "" >&2
+  INDEX=1
+  for f in "${masters_array[@]}"; do
+    echo "  [$INDEX] $(basename "$f" .tex)" >&2
+    INDEX=$((INDEX + 1))
+  done
+  echo "" >&2
+
+  while true; do
+    echo -e "${BLUE}Enter number (1-${master_count}):${RESET} \c" >&2
+    read -r CHOICE
+
+    if [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le "$master_count" ]; then
+      selected_master="${masters_array[$((CHOICE - 1))]}"
+      break
+    else
+      warning "Invalid choice. Please enter a number between 1 and ${master_count}." >&2
+    fi
+  done
+
+  echo "$selected_master"
+}
+
+# -----------------------------------------------
+# Select master(s) based on document type
+# -----------------------------------------------
+
+RESUME_MASTER=""
+COVER_LETTER_MASTER=""
+
+if [ "$DOC_TYPE" = "cv" ] || [ "$DOC_TYPE" = "both" ]; then
+  if [ ! -e "${RESUME_MASTERS[0]}" ]; then
+    error "No resume masters found in masters/resume/"
+    exit 1
+  fi
+  echo ""
+  echo -e "${BLUE}Choose a resume master:${RESET}"
+  RESUME_MASTER=$(select_master "${RESUME_MASTERS[@]}")
+  RESUME_MASTER_NAME="$(basename "$RESUME_MASTER" .tex)"
+fi
+
+if [ "$DOC_TYPE" = "cover" ] || [ "$DOC_TYPE" = "both" ]; then
+  if [ ! -e "${COVER_LETTER_MASTERS[0]}" ]; then
+    error "No cover letter masters found in masters/cover_letter/"
+    exit 1
+  fi
+  echo ""
+  echo -e "${BLUE}Choose a cover letter master:${RESET}"
+  COVER_LETTER_MASTER=$(select_master "${COVER_LETTER_MASTERS[@]}")
+  COVER_LETTER_MASTER_NAME="$(basename "$COVER_LETTER_MASTER" .tex)"
+fi
+
+# -----------------------------------------------
+# Create company folder(s) and copy master(s)
 # -----------------------------------------------
 
 echo ""
 
-DEST_DIR="$SCRIPT_DIR/companies/$COMPANY"
-DEST_FILE="$DEST_DIR/${USER_NAME}_cv.tex"
-
-mkdir -p "$DEST_DIR"
-
-if [ -f "$DEST_FILE" ]; then
-  warning "CV already exists for $COMPANY — opening existing file"
+# Build company directory path (with optional role subfolder)
+if [ -n "$ROLE" ]; then
+  COMPANY_DIR="$SCRIPT_DIR/companies/$COMPANY/$ROLE"
+  DISPLAY_PATH="companies/$COMPANY/$ROLE"
 else
-  cp "$MASTER" "$DEST_FILE"
-  success "Created: companies/$COMPANY/${USER_NAME}_cv.tex  (from $MASTER_NAME)"
+  COMPANY_DIR="$SCRIPT_DIR/companies/$COMPANY"
+  DISPLAY_PATH="companies/$COMPANY"
+fi
+
+RESUME_DEST_DIR="$COMPANY_DIR/resume"
+COVER_LETTER_DEST_DIR="$COMPANY_DIR/cover_letter"
+
+FILES_TO_OPEN=()
+
+# Create resume if requested
+if [ -n "$RESUME_MASTER" ]; then
+  mkdir -p "$RESUME_DEST_DIR"
+  RESUME_DEST_FILE="$RESUME_DEST_DIR/${USER_NAME}_cv.tex"
+
+  if [ -f "$RESUME_DEST_FILE" ]; then
+    warning "Resume already exists for $DISPLAY_PATH — will open existing file"
+  else
+    cp "$RESUME_MASTER" "$RESUME_DEST_FILE"
+    success "Created: $DISPLAY_PATH/resume/${USER_NAME}_cv.tex  (from $RESUME_MASTER_NAME)"
+  fi
+  FILES_TO_OPEN+=("$RESUME_DEST_FILE")
+fi
+
+# Create cover letter if requested
+if [ -n "$COVER_LETTER_MASTER" ]; then
+  mkdir -p "$COVER_LETTER_DEST_DIR"
+  COVER_LETTER_DEST_FILE="$COVER_LETTER_DEST_DIR/${USER_NAME}_cover_letter.tex"
+
+  if [ -f "$COVER_LETTER_DEST_FILE" ]; then
+    warning "Cover letter already exists for $DISPLAY_PATH — will open existing file"
+  else
+    cp "$COVER_LETTER_MASTER" "$COVER_LETTER_DEST_FILE"
+    success "Created: $DISPLAY_PATH/cover_letter/${USER_NAME}_cover_letter.tex  (from $COVER_LETTER_MASTER_NAME)"
+  fi
+  FILES_TO_OPEN+=("$COVER_LETTER_DEST_FILE")
 fi
 
 # -----------------------------------------------
@@ -235,23 +377,33 @@ fi
 
 info "Opening in VS Code..."
 
-if ! "$VSCODE_PATH" "$DEST_FILE" 2>/dev/null; then
-  warning "Could not open VS Code automatically"
-  echo "      Open this file manually:"
-  echo "        $DEST_FILE"
-  exit 1
-fi
+for file in "${FILES_TO_OPEN[@]}"; do
+  if ! "$VSCODE_PATH" "$file" 2>/dev/null; then
+    warning "Could not open VS Code automatically"
+    echo "      Open this file manually:"
+    echo "        $file"
+  fi
+done
 
 echo ""
 success "Done!"
 echo ""
 echo -e "${BOLD}  Your files:${RESET}"
-echo "    TEX  →  $DEST_FILE"
-echo "    PDF  →  $DEST_DIR/${USER_NAME}_cv.pdf  (generated on first save)"
+
+if [ -n "$RESUME_MASTER" ]; then
+  echo "    Resume TEX  →  $RESUME_DEST_FILE"
+  echo "    Resume PDF  →  $RESUME_DEST_DIR/${USER_NAME}_cv.pdf  (generated on first save)"
+fi
+
+if [ -n "$COVER_LETTER_MASTER" ]; then
+  echo "    Cover TEX   →  $COVER_LETTER_DEST_FILE"
+  echo "    Cover PDF   →  $COVER_LETTER_DEST_DIR/${USER_NAME}_cover_letter.pdf  (generated on first save)"
+fi
+
 echo ""
 echo -e "${BOLD}  Next steps:${RESET}"
-echo "    1. Edit your CV in VS Code"
+echo "    1. Edit your document(s) in VS Code"
 echo "    2. Hit Cmd+S (Mac) / Ctrl+S (Linux) to compile"
 echo "    3. Click 'View LaTeX PDF' to preview side by side"
-echo "    4. Submit the PDF from the path above"
+echo "    4. Submit the PDF(s) to your application"
 echo ""
